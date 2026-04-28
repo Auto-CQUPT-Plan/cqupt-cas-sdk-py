@@ -1,9 +1,33 @@
 import base64
 import random
+import re
 
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
-from lxml import etree  # type: ignore
+
+
+def extract_input_value(html: str, *attrs: str) -> str:
+    input_pattern = r"<input[^>]+"
+    for attr in attrs:
+        input_pattern += rf"[^>]*{re.escape(attr)}[^>]*"
+    input_pattern += r"[^>]*>"
+
+    match = re.search(input_pattern, html, re.IGNORECASE)
+    if not match:
+        return ""
+
+    input_tag = match.group(0)
+
+    value_match = re.search(
+        r'value\s*=\s*["\']([^"\']*)["\']',
+        input_tag,
+        re.IGNORECASE,
+    )
+
+    if value_match:
+        return value_match.group(1)
+
+    raise Exception("提取失败: {}".format(attrs))
 
 
 def random_string(length):
@@ -61,11 +85,7 @@ def aes_encrypt(password, salt) -> str:
 
 
 def get_execution_and_salt(html: str) -> tuple[str, str]:
-    execution_xpath = "//*[@id='execution']/@value"
-    salt_xpath = "//*[@id='pwdEncryptSalt']/@value"
+    execution = extract_input_value(html, 'id="execution"', 'name="execution"')
+    salt = extract_input_value(html, 'id="pwdEncryptSalt"')
 
-    html = etree.HTML(html)
-    execution = html.xpath(execution_xpath)  # type: ignore
-    salt = html.xpath(salt_xpath)  # type: ignore
-
-    return execution[0], salt[0]
+    return execution, salt
