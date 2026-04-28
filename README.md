@@ -48,7 +48,7 @@ ticket = cas_client.ticket
 ```python
 from cqupt_cas import AsyncClient
 
-cas_client = await AsyncClient("id", "passwd", "https://i.cqupt.edu.cn")
+cas_client = AsyncClient("id", "passwd", "https://i.cqupt.edu.cn")
 
-ticket = cas_client.ticket
+ticket = await cas_client.ticket()
 ```

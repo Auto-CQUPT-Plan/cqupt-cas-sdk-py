@@ -1,5 +1,4 @@
-import aiohttp
-
+from aiohttp import request
 from urllib.parse import quote
 from .utils import aes_encrypt, get_execution_and_salt
 
@@ -12,12 +11,10 @@ class AsyncClient:
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36",
     }
 
-    async def __init__(self, username: str, password: str, service: str) -> None:
+    def __init__(self, username: str, password: str, service: str) -> None:
         self.username = username
         self.password = password
         self.service = service
-
-        self.ticket = await self.__init()
 
     async def __login(
         self, username: str, password: str, execution: str, cookie: str, service: str
@@ -35,23 +32,23 @@ class AsyncClient:
             "execution": execution,
         }
 
-        async with aiohttp.ClientSession() as session:
-            resp = await session.post(
-                url=url,
-                headers={**self.HEADERS, "Cookie": cookie},
-                data=parm,
-                allow_redirects=False,
-            )
+        async with request(
+            method="POST",
+            url=url,
+            headers={**self.HEADERS, "Cookie": cookie},
+            data=parm,
+            allow_redirects=False,
+        ) as resp:
+            if "该帐号已经被冻结" in await resp.text():
+                raise Exception("该帐号已经被冻结")
 
-        if "该帐号已经被冻结" in await resp.text():
-            raise Exception("该帐号已经被冻结")
+            ticket = resp.headers.get("Location")
 
-        ticket = resp.headers.get("Location")
         if not ticket:
             raise Exception("登录失败")
         return ticket
 
-    async def __init(self):
+    async def ticket(self) -> str:
         # 登录流程:
         #     1. 第一次请求界面获取Cookie (route&jssid)
         #     2. 第二次请求界面, 携带第一次的Cookie获取execution和pwdEncryptSalt
@@ -61,19 +58,20 @@ class AsyncClient:
             self.BASE_URL, quote(self.service)
         )
 
-        session = aiohttp.ClientSession()
+        async with request(method="GET", url=url, headers=self.HEADERS) as resp:
+            cookie = resp.cookies
 
-        resp = await session.get(url, headers=self.HEADERS)
-        cookie = resp.headers["Set-Cookie"].split()
-        html = await resp.text()
+        cookie = "; ".join(f"{c.key}={c.value}" for c in cookie.values())
 
-        cookie = cookie[0] + cookie[2]
+        async with request(
+            method="GET", url=url, headers={**self.HEADERS, "Cookie": cookie}
+        ) as resp:
+            html = await resp.text()
 
-        resp = await session.get(url, headers={**self.HEADERS, "Cookie": cookie})
-        html = await resp.text()
         execution, pwdEncryptSalt = get_execution_and_salt(html)
 
         passwd = aes_encrypt(self.password, pwdEncryptSalt)
 
-        await session.close()
-        return await self.__login(self.username, passwd, execution, cookie, self.service)
+        return await self.__login(
+            self.username, passwd, execution, cookie, self.service
+        )
