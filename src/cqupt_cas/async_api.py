@@ -76,4 +76,4 @@ class AsyncClient:
         passwd = aes_encrypt(self.password, pwdEncryptSalt)
 
         await session.close()
-        await self.__login(self.username, passwd, execution, cookie, self.service)
+        return await self.__login(self.username, passwd, execution, cookie, self.service)

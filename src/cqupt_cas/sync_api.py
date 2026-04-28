@@ -73,4 +73,4 @@ class Client:
 
         passwd = aes_encrypt(self.password, pwdEncryptSalt)
 
-        self.__login(self.username, passwd, execution, cookie, self.service)
+        return self.__login(self.username, passwd, execution, cookie, self.service)
