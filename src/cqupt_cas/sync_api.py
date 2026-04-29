@@ -62,10 +62,9 @@ class Client:
         )
 
         resp = requests.get(url, headers=self.HEADERS)
-        cookie = resp.headers["Set-Cookie"].split()
+        cookies = resp.cookies
+        cookie = "".join(f"{c}={cookies.get(c)}; " for c in cookies.keys())
         html = resp.text
-
-        cookie = cookie[0] + cookie[2]
 
         resp = requests.get(url, headers={**self.HEADERS, "Cookie": cookie})
         html = resp.text
